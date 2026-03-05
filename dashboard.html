@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="LaunchPe Dashboard — Manage your launch plans, track post history, and monitor your launch strategy." />
+        <title>Dashboard — LaunchPe</title>
+        <link rel="stylesheet" href="css/style.css" />
+        <link rel="stylesheet" href="css/dashboard.css" />
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230D0D12'/><text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' font-size='16' font-weight='700' font-family='serif' fill='%23FAFAF8'>L</text></svg>" />
+    </head>
+
+    <body>
+
+        <!-- NAV -->
+        <nav id="nav" class="scrolled">
+            <a href="index.html" class="logo">
+                <div class="logo-sq">L</div>
+                LaunchPe
+            </a>
+            <div class="nav-r" id="navR">
+                <a href="index.html">Home</a>
+                <a href="index.html#demo">Demo</a>
+                <a href="index.html#pricing">Pricing</a>
+            </div>
+            <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+                <span class="ham-line"></span>
+                <span class="ham-line"></span>
+                <span class="ham-line"></span>
+            </button>
+        </nav>
+
+        <!-- Mobile menu -->
+        <div class="mobile-menu" id="mobileMenu">
+            <a href="index.html">Home</a>
+            <a href="index.html#demo">Demo</a>
+            <a href="index.html#pricing">Pricing</a>
+        </div>
+
+        <!-- Dashboard Content -->
+        <section class="dash-section">
+            <div class="dash-wrap">
+
+                <!-- Loading state -->
+                <div id="dashLoading" class="dash-loading">
+                    <div class="spin"></div>
+                    <p>Loading your dashboard...</p>
+                </div>
+
+                <!-- Not logged in -->
+                <div id="dashNoAuth" class="dash-empty" style="display:none">
+                    <div class="dash-empty-icon">🔒</div>
+                    <h2>Please sign in</h2>
+                    <p>You need to be logged in to access your dashboard.</p>
+                    <button class="btn-solid" onclick="openAuthModal('login')">Sign In →</button>
+                </div>
+
+                <!-- Dashboard (shown when logged in) -->
+                <div id="dashContent" style="display:none">
+
+                    <!-- Header -->
+                    <div class="dash-header">
+                        <div>
+                            <h1 class="dash-title">Welcome, <span id="dashUserName">Founder</span> 👋</h1>
+                            <p class="dash-subtitle">Manage your launch plan and track your progress</p>
+                        </div>
+                        <div class="dash-header-actions">
+                            <a href="index.html#demo" class="btn-outline btn-sm">Analyze URL</a>
+                            <button class="btn-outline btn-sm" onclick="signOutUser()">Sign Out</button>
+                        </div>
+                    </div>
+
+                    <!-- Expiry Warning Banner -->
+                    <div id="expiryBanner" class="expiry-banner" style="display:none">
+                        <div class="expiry-icon" id="expiryIcon">⚠️</div>
+                        <div class="expiry-text" id="expiryText"></div>
+                        <button class="btn-solid btn-sm" id="renewBtn" onclick="renewPlan()">Renew Plan →</button>
+                    </div>
+
+                    <!-- Plan Cards Grid -->
+                    <div class="dash-grid">
+
+                        <!-- Current Plan -->
+                        <div class="dash-card plan-card">
+                            <div class="dash-card-header">
+                                <h3>📋 Current Plan</h3>
+                                <span class="plan-badge" id="planBadge">No Plan</span>
+                            </div>
+                            <div class="plan-details" id="planDetails">
+                                <div class="plan-none">
+                                    <p>You haven't purchased a plan yet.</p>
+                                    <a href="index.html#pricing" class="btn-solid btn-sm">Get a Plan →</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Account Info -->
+                        <div class="dash-card">
+                            <div class="dash-card-header">
+                                <h3>👤 Account</h3>
+                            </div>
+                            <div class="account-details">
+                                <div class="account-row">
+                                    <span class="account-label">Email</span>
+                                    <span class="account-value" id="dashEmail">—</span>
+                                </div>
+                                <div class="account-row">
+                                    <span class="account-label">Member since</span>
+                                    <span class="account-value" id="dashJoined">—</span>
+                                </div>
+                                <div class="account-row">
+                                    <span class="account-label">User ID</span>
+                                    <span class="account-value account-uid" id="dashUid">—</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Post History -->
+                    <div class="dash-card dash-card-full">
+                        <div class="dash-card-header">
+                            <h3>📤 Your Posts</h3>
+                            <span class="post-count" id="postCount">0 posts</span>
+                        </div>
+                        <div id="postHistory" class="post-history">
+                            <div class="post-empty">
+                                <p>No posts yet. Use the <a href="index.html#demo">demo</a> to generate content and post to platforms!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="dash-card dash-card-full">
+                        <div class="dash-card-header">
+                            <h3>⚡ Quick Actions</h3>
+                        </div>
+                        <div class="quick-actions">
+                            <a href="index.html#demo" class="quick-action">
+                                <div class="qa-icon">🔍</div>
+                                <div>
+                                    <div class="qa-title">Analyze a URL</div>
+                                    <div class="qa-desc">Get a launch strategy for any product</div>
+                                </div>
+                            </a>
+                            <a href="index.html#pricing" class="quick-action">
+                                <div class="qa-icon">💳</div>
+                                <div>
+                                    <div class="qa-title">Upgrade Plan</div>
+                                    <div class="qa-desc">Get more features and communities</div>
+                                </div>
+                            </a>
+                            <a href="https://www.producthunt.com/posts/new" target="_blank" rel="noopener noreferrer" class="quick-action">
+                                <div class="qa-icon">🚀</div>
+                                <div>
+                                    <div class="qa-title">Launch on Product Hunt</div>
+                                    <div class="qa-desc">Submit your product to PH</div>
+                                </div>
+                            </a>
+                            <a href="#" class="quick-action" onclick="toggleAlerts(event)">
+                                <div class="qa-icon" id="alertIcon">🔔</div>
+                                <div>
+                                    <div class="qa-title">Daily Mentions Alert</div>
+                                    <div class="qa-desc" id="alertDesc">Off (Click to enable)</div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <script>
+                        function toggleAlerts(e) {
+                            e.preventDefault();
+                            const icon = document.getElementById('alertIcon');
+                            const desc = document.getElementById('alertDesc');
+                            if (desc.innerText.includes('Off')) {
+                                icon.style.color = 'var(--moss)';
+                                desc.innerText = 'On (Emails active)';
+                                showToast('✅ Daily Mention Alerts enabled!');
+                            } else {
+                                icon.style.color = '';
+                                desc.innerText = 'Off (Click to enable)';
+                                showToast('⏸️ Daily Mention Alerts paused.');
+                            }
+                        }
+                    </script>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <a href="index.html" class="logo">
+                <div class="logo-sq">L</div>
+                LaunchPe
+            </a>
+            <div class="fl">
+                <a href="#">Privacy</a>
+                <a href="#">Terms</a>
+                <a href="mailto:hello@launchpe.in">Contact</a>
+            </div>
+            <div class="fc2">© 2025 LaunchPe · Built for Indian founders 🇮🇳</div>
+        </footer>
+
+        <!-- Firebase SDK -->
+        <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+        <!-- Razorpay -->
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+        <!-- App Scripts -->
+        <script src="js/firebase-config.js"></script>
+        <script src="js/auth.js"></script>
+        <script src="js/dashboard.js"></script>
+
+    </body>
+
+</html>

@@ -1,0 +1,9 @@
+.env
+.env.local
+.env.example
+.env.production
+.DS_Store
+Thumbs.db
+node_modules/
+.netlify/
+*.code-workspace
