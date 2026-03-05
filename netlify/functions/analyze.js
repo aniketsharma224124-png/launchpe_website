@@ -1,8 +1,10 @@
 /* ─────────────────────────────────────────
-   netlify/functions/analyze.js
-   - Fetches real website HTML
-   - Uses Groq web_search for real WhatsApp/Telegram communities
-   - Basic: 10 communities, Premium: 20+
+   netlify/functions/analyze.js  v9
+   KEY FIXES:
+   • Fetch timeout 4s (was 9s — was killing Netlify 10s limit)
+   • sanitize() keeps double quotes (they're fine in prompt)
+   • response_format: json_object for guaranteed JSON
+   • Robust fallback if site unreachable
 ─────────────────────────────────────────── */
 
 const CORS = {
@@ -12,162 +14,187 @@ const CORS = {
   'Content-Type': 'application/json'
 };
 
+// Only strip chars that break JS template literals
+function sanitize(str) {
+  return str
+    .replace(/`/g, "'")
+    .replace(/\$\{/g, 'S{')
+    .replace(/\\/g, ' ')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };
+  if (event.httpMethod !== 'POST')    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   const KEY = process.env.GROQ_API_KEY;
   if (!KEY) return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'GROQ_API_KEY not set in Netlify env vars' }) };
 
   let url;
   try {
-    const body = JSON.parse(event.body || '{}');
-    url = (body.url || '').trim().toLowerCase();
-    if (!url) throw new Error('No URL');
-  } catch (e) {
+    const b = JSON.parse(event.body || '{}');
+    url = (b.url || '').trim().toLowerCase().replace(/^www\./, '').split('/')[0].split('?')[0];
+    if (!url) throw new Error('no url');
+  } catch (_) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid request' }) };
   }
 
-  // ── Step 1: Fetch real website content ──
-  let websiteContent = '';
+  // ── Fetch website — 4s timeout so we stay within Netlify 10s limit ──
+  let siteText = '';
   let fetchSuccess = false;
-  for (const target of [`https://${url}`, `https://www.${url}`, `http://${url}`]) {
+  for (const target of [`https://${url}`, `https://www.${url}`]) {
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 8000);
+      const t = setTimeout(() => ctrl.abort(), 4000);  // 4s max
       const r = await fetch(target, {
         signal: ctrl.signal,
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LaunchPeBot/1.0)', 'Accept': 'text/html' }
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' }
       });
       clearTimeout(t);
-      if (r.ok) {
-        const html = await r.text();
-        websiteContent = html
-          .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-          .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-          .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
-          .replace(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["'][^>]*>/gi, ' METADESC: $1 ')
-          .replace(/<title[^>]*>([^<]+)<\/title>/gi, ' TITLE: $1 ')
-          .replace(/<h1[^>]*>([^<]{3,80})<\/h1>/gi, ' H1: $1 ')
-          .replace(/<h2[^>]*>([^<]{3,80})<\/h2>/gi, ' H2: $1 ')
+      if (!r.ok) continue;
+      const html = await r.text();
+
+      const get = (rx) => (html.match(rx) || [])[1] || '';
+      const all = (rx) => [...html.matchAll(rx)].map(m => m[1]).slice(0, 4).join(' | ');
+
+      const parts = [
+        get(/<title[^>]*>([^<]{3,120})<\/title>/i),
+        get(/<meta[^>]*name="description"[^>]*content="([^"]{10,300})"/i),
+        get(/<meta[^>]*property="og:title"[^>]*content="([^"]{3,120})"/i),
+        get(/<meta[^>]*property="og:description"[^>]*content="([^"]{10,300})"/i),
+        all(/<h1[^>]*>([^<]{3,100})<\/h1>/gi),
+        all(/<h2[^>]*>([^<]{3,100})<\/h2>/gi),
+      ].filter(Boolean);
+
+      if (parts.length > 0) {
+        // Also grab body text briefly
+        const body = html
+          .replace(/<script[\s\S]*?<\/script>/gi, '')
+          .replace(/<style[\s\S]*?<\/style>/gi, '')
           .replace(/<[^>]+>/g, ' ')
-          .replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
-          .replace(/\s+/g, ' ').trim().substring(0, 3500);
+          .replace(/\s+/g, ' ').trim().slice(0, 1500);
+        parts.push(body);
+        siteText = parts.join(' | ');
         fetchSuccess = true;
         break;
       }
-    } catch (_) {}
+    } catch (_) { /* timeout or network error — try next */ }
   }
-  if (!websiteContent) websiteContent = `Could not fetch ${url}. Infer from domain only.`;
 
-  // ── Step 2: Build prompt ──
-  const system = `You are LaunchPe, an AI launch tool for Indian founders. Output ONLY valid JSON. No markdown, no backticks. Escape all newlines in strings as \\n.`;
+  if (!siteText) siteText = `Domain: ${url}. Site unreachable — infer category from domain name.`;
+  const safe = sanitize(siteText).slice(0, 2500);
 
-  const prompt = `Analyze this product and generate a complete launch strategy.
+  // ── Groq prompt ──
+  const sys = `You are LaunchPe, an AI that helps Indian startup founders launch their products.
+Output ONLY a valid JSON object. No markdown. No explanation. No text outside the JSON.
+Use double quotes for all JSON keys and string values.`;
+
+  const usr = `Analyze this product and return a complete launch strategy.
 
 URL: ${url}
-WEBSITE CONTENT:
----
-${websiteContent}
----
+SITE DATA: ${safe}
 
-Generate launch strategy as this EXACT JSON (no extra fields, no markdown):
-
+Return this exact JSON (all fields required, specific to THIS product):
 {
-  "ico": "one emoji",
-  "name": "product name from website",
+  "ico": "emoji",
+  "name": "product name",
   "url": "${url}",
-  "desc": "one precise sentence describing what this product does",
+  "desc": "one sentence describing what this does and who it helps",
   "tags": ["Category", "Market", "Type"],
-  "count": "10 matches · 4 platforms",
-  "rMeta": "6 subreddits · 3 post angles",
+  "count": "10 communities · 4 platforms",
+  "rMeta": "5 subreddits · 3 post angles",
   "rComms": [
-    ["r/realsubreddit1", "memberCount", "relevance%"],
-    ["r/realsubreddit2", "memberCount", "relevance%"],
-    ["r/realsubreddit3", "memberCount", "relevance%"]
+    ["r/indianstartups", "120K members", "98%"],
+    ["r/india", "800K members", "88%"],
+    ["r/startups", "1.2M members", "82%"]
   ],
   "rPost": {
-    "title": "Reddit title — genuine value, not clickbait, max 12 words",
-    "body": "2 short paragraphs. Founder voice. Specific to this product. Max 80 words total.",
-    "sub": "r/bestsubreddit",
-    "upvotes": "250"
+    "title": "Reddit title under 12 words, genuine not clickbait",
+    "body": "Paragraph 1: problem/story (2 sentences).\\nParagraph 2: what you built + URL (2 sentences). Max 70 words.",
+    "sub": "r/indianstartups",
+    "upvotes": "320"
   },
   "liPost": {
-    "body": "Hook line.\\nLine 2.\\nLine 3.\\nLine 4.\\nLine 5.\\nURL. Max 80 words. Line breaks between each line.",
+    "body": "Hook line.\\nPoint 2.\\nPoint 3.\\nPoint 4.\\nCTA + URL.\\nMax 80 words total.",
     "name": "You",
-    "role": "Founder at ProductName",
-    "likes": 400,
-    "comments": 60,
-    "reposts": 35
+    "role": "Founder",
+    "likes": 480,
+    "comments": 72,
+    "reposts": 41
   },
   "twPost": {
-    "thread": ["Tweet1 hook max 200 chars", "Tweet2 insight max 200 chars", "Tweet3 proof max 200 chars", "Tweet4 CTA+URL max 200 chars"],
+    "thread": [
+      "Tweet 1: hook, max 220 chars",
+      "Tweet 2: insight or problem, max 220 chars",
+      "Tweet 3: result or proof, max 220 chars",
+      "Tweet 4: CTA with URL, max 220 chars"
+    ],
     "handle": "@yourhandle"
   },
   "waPost": {
-    "en": "2 sentence WhatsApp message. Casual. Includes URL.",
-    "hi": "Same in natural Hinglish."
+    "en": "2-sentence casual WhatsApp message recommending the product with URL.",
+    "hi": "Same in Hinglish."
   },
   "waComms": [
-    ["Real Indian WhatsApp/Telegram community name 1 relevant to this product", "relevance%"],
-    ["Real Indian community name 2", "relevance%"],
-    ["Real Indian community name 3", "relevance%"],
-    ["Real Indian community name 4", "relevance%"],
-    ["Real Indian community name 5", "relevance%"],
-    ["Real Indian community name 6", "relevance%"],
-    ["Real Indian community name 7", "relevance%"],
-    ["Real Indian community name 8", "relevance%"],
-    ["Real Indian community name 9", "relevance%"],
-    ["Real Indian community name 10", "relevance%"]
+    ["Indian Startup Founders Telegram", "97%"],
+    ["SaaS Founders India", "93%"],
+    ["Indie Hackers India", "90%"],
+    ["IIT Alumni Network", "87%"],
+    ["Product Hunt India Telegram", "85%"],
+    ["Dev Community India", "83%"],
+    ["VC and Angel India", "80%"],
+    ["Startup India Telegram", "78%"],
+    ["Freelancers India", "76%"],
+    ["B2B SaaS India", "74%"]
   ],
-  "score": 75,
+  "score": 78,
   "sTitle": "High Viral Potential",
-  "sDesc": "Two short sentences. Why this score. Which platform works best first."
-}
+  "sDesc": "2 sentences: why this score and which platform to prioritise first."
+}`;
 
-RULES:
-- Use actual website content — no invented features
-- rComms: real subreddits for this product's niche
-- waComms: 10 very specific, real Indian WhatsApp/Telegram group types (e.g. "SaaS Founders India Telegram", "Delhi Startup Network WhatsApp", "IIT Alumni Founders Group") — be niche-specific, NOT generic
-- All post content must be SHORT — max 80 words per post
-- Posts must sound authentic, not like ads`;
-
-  // ── Step 3: Groq call ──
   try {
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const gr = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${KEY}` },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 3000,
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }],
+        temperature: 0.6,
+        max_tokens: 2000,
         response_format: { type: 'json_object' }
       })
     });
 
-    if (!groqRes.ok) {
-      const s = groqRes.status;
-      if (s === 429) return { statusCode: 429, headers: CORS, body: JSON.stringify({ error: 'Rate limit. Please wait 10 seconds.' }) };
-      const t = await groqRes.text();
-      return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: `Groq error ${s}: ${t.substring(0,150)}` }) };
+    if (!gr.ok) {
+      const st = gr.status;
+      if (st === 429) return { statusCode: 429, headers: CORS, body: JSON.stringify({ error: 'AI busy — wait 10 seconds and retry' }) };
+      const txt = await gr.text().catch(() => '');
+      return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: `Groq error ${st}` }) };
     }
 
-    const gData = await groqRes.json();
-    const raw = gData.choices?.[0]?.message?.content || '';
+    const gj  = await gr.json();
+    const raw = (gj.choices?.[0]?.message?.content || '').trim();
     if (!raw) return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'Empty AI response' }) };
 
-    const cleaned = raw.replace(/```json/gi,'').replace(/```/g,'').trim();
-    const parsed = JSON.parse(cleaned);
-    parsed._fetchSuccess = fetchSuccess;
+    // Extract JSON (strip any accidental markdown)
+    const match = raw.match(/\{[\s\S]+\}/);
+    const jsonStr = match ? match[0] : raw;
 
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (_) {
+      const fixed = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+      parsed = JSON.parse(fixed); // throws if still broken → caught below
+    }
+
+    parsed._fetchSuccess = fetchSuccess;
     return { statusCode: 200, headers: CORS, body: JSON.stringify(parsed) };
 
   } catch (e) {
-    console.error('analyze error:', e);
+    console.error('analyze error:', e.message);
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: e.message }) };
   }
 };

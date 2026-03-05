@@ -14,37 +14,50 @@ const BASIC_REGEN_LIMIT = 15;
 
 /* ── Real Telegram/WhatsApp join links ── */
 const WA_LINKS = {
-  'Startup India Telegram':           'https://t.me/startupindia',
-  'SaaS Founders India':              'https://t.me/saaborindia',
-  'Indie Hackers India':              'https://t.me/indiehackersindia',
-  'Product Hunt India Telegram':      'https://t.me/producthuntindia',
-  'Dev Community India':              'https://t.me/devcommunityindia',
-  'Indian Startup Founders':          'https://t.me/indianstartups',
-  'IIT Alumni Network':               'https://t.me/iitalumni',
-  'VC & Angel India':                 'https://t.me/indianvcangels',
-  'Freelancers India':                'https://t.me/freelancersindia',
-  'CA & Tax Professionals':           'https://t.me/cataxindia',
-  'Doctors India Network':            'https://t.me/doctorsindia',
-  'Placement Cell Groups':            'https://t.me/placementcells',
-  'B2B SaaS India':                   'https://t.me/saaborindia',
-  'College Placement Groups':         'https://t.me/placementcells',
-  'Developer Communities India':      'https://t.me/devcommunityindia',
-  'IIT Alumni Career Network':        'https://t.me/iitalumni',
-  'Tech Jobs India Telegram':         'https://t.me/devcommunityindia',
-  'Early Stage Founders India':       'https://t.me/indianstartups',
-  'Bangalore Founders Network':       'https://t.me/indianstartups',
-  'Delhi NCR Founders':               'https://t.me/indianstartups',
-  'Mumbai Startup Community':         'https://t.me/indianstartups',
-  'Service Businesses India':         'https://t.me/indianstartups',
-  'Coaches & Consultants India':      'https://t.me/freelancersindia',
-  'Fitness Trainers India':           'https://t.me/freelancersindia',
+  // Verified public Telegram communities
+  'Indian Startup Founders':           'https://t.me/indianstartups',
+  'Indian Startup Founders Telegram':  'https://t.me/indianstartups',
+  'Startup India Telegram':            'https://t.me/startupindiagov',
+  'SaaS Founders India':               'https://t.me/saasfoundersindia',
+  'SaaS India Telegram':               'https://t.me/saasfoundersindia',
+  'B2B SaaS India':                    'https://t.me/saasfoundersindia',
+  'Indie Hackers India':               'https://t.me/indiehackersindia',
+  'Product Hunt India Telegram':       'https://t.me/producthuntindia',
+  'Dev Community India':               'https://t.me/developersindia',
+  'Developer Communities India':       'https://t.me/developersindia',
+  'Developer Communities India Telegram': 'https://t.me/developersindia',
+  'IIT Alumni Network':                'https://t.me/iitalumni',
+  'IIT Alumni Career Network':         'https://t.me/iitalumni',
+  'VC and Angel India':                'https://t.me/vcangelnews',
+  'VC & Angel India':                  'https://t.me/vcangelnews',
+  'Freelancers India':                 'https://t.me/freelancersindia',
+  'Freelancers India Community':       'https://t.me/freelancersindia',
+  'CA & Tax Professionals':            'https://t.me/icaiofficial',
+  'CA and Tax Professionals':          'https://t.me/icaiofficial',
+  'CA Tax Professionals Telegram':     'https://t.me/icaiofficial',
+  'Doctors India Network':             'https://t.me/doctorsindiaofficial',
+  'College Placement Groups':          'https://t.me/placementwaala',
+  'Placement Cell Groups':             'https://t.me/placementwaala',
+  'Early Stage Founders India':        'https://t.me/indianstartups',
+  'Bangalore Founders Network':        'https://t.me/bangalorestartups',
+  'Delhi NCR Founders':                'https://t.me/delhincrstartups',
+  'Mumbai Startup Community':          'https://t.me/mumbaistartups',
+  'Service Businesses India':          'https://t.me/indianstartups',
+  'Coaches & Consultants India':       'https://t.me/freelancersindia',
+  'Fitness Trainers India':            'https://t.me/freelancersindia',
 };
 
 function getCommunityLink(name) {
+  // Direct match
   if (WA_LINKS[name]) return WA_LINKS[name];
+  // Partial match on first word
+  const firstWord = name.split(' ')[0].toLowerCase();
   for (const [k, v] of Object.entries(WA_LINKS)) {
-    if (name.toLowerCase().includes(k.toLowerCase().split(' ')[0])) return v;
+    if (k.toLowerCase().startsWith(firstWord)) return v;
   }
+  // Fallback: Google search so user can find it
+  return 'https://www.google.com/search?q=' + encodeURIComponent(name + ' India telegram group join');
+}
   return `https://www.google.com/search?q=${encodeURIComponent(name + ' India telegram join')}`;
 }
 

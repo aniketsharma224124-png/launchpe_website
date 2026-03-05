@@ -2233,13 +2233,15 @@ footer {
 
 .cal-post-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 12px 14px;
   background: white;
   border: 1px solid var(--line);
   border-radius: 8px;
   transition: border-color .15s;
+  flex-wrap: wrap;
 }
 
 .cal-post-item:hover {
@@ -2256,6 +2258,7 @@ footer {
 .cal-post-info {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .cal-post-platform {
@@ -3334,11 +3337,7 @@ footer { background: var(--card); border-top: 1px solid var(--line); }
 /* ─────────────────────────────────────────
    CALENDAR — AI Generate per post
 ───────────────────────────────────────── */
-.cal-post-item {
-  align-items: flex-start !important;
-  gap: 10px !important;
-  flex-wrap: wrap;
-}
+
 .cal-post-left {
   display: flex;
   gap: 10px;
@@ -3365,6 +3364,7 @@ footer { background: var(--card); border-top: 1px solid var(--line); }
   align-items: flex-end;
   gap: 6px;
   flex-shrink: 0;
+  min-width: 140px;
 }
 .cal-post-btns {
   display: flex;
