@@ -878,7 +878,7 @@ function renderPremiumFeatures(d, planInfo) {
         <div class="ph-kit-content" contenteditable="true">Hey Product Hunt! 👋 I'm the maker of ${d.name}. ${d.sDesc} Happy to answer anything!</div>
         <button class="tool-btn copy-btn" onclick="copyText(this.previousElementSibling)">📋</button>
       </div>
-      <a href="https://www.producthunt.com/posts/new" target="_blank" class="btn-solid btn-sm" style="margin-top:12px">🚀 Launch on Product Hunt →</a>
+      <a href="https://www.producthunt.com/" target="_blank" class="btn-solid btn-sm" style="margin-top:12px">🚀 Launch on Product Hunt →</a>
     </div>`;
     ins(ph);
 
@@ -969,7 +969,7 @@ function renderCalDetail(day) {
         <div class="cal-post-dot" style="background:${p.color}"></div>
         <div class="cal-post-info">
           <div class="cal-post-platform">${p.platform}
-            ${p.platform === 'ProductHunt' ? `<a href="https://www.producthunt.com/posts/new" target="_blank" class="cal-ph-link">↗ Launch</a>` : ''}
+            ${p.platform === 'ProductHunt' ? `<a href="https://www.producthunt.com/" target="_blank" class="cal-ph-link">↗ Launch</a>` : ''}
           </div>
           <div class="cal-post-type">${p.type}</div>
           <div class="cal-post-desc">${p.desc}</div>
@@ -1076,7 +1076,7 @@ function calPostNow(platform, sub, dayIdx, postIdx) {
       LinkedIn:    `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(content)}`,
       Twitter:     `https://twitter.com/intent/tweet?text=${encodeURIComponent(content.substring(0, 280))}`,
       WhatsApp:    `https://web.whatsapp.com/send?text=${encodeURIComponent(content)}`,
-      ProductHunt: 'https://www.producthunt.com/posts/new',
+      ProductHunt: 'https://www.producthunt.com/',
     };
 
     if (platform === 'LinkedIn') {
