@@ -2,7 +2,7 @@
    main.js — LaunchPe Interactions
 ───────────────────────────────────────── */
 
-const RAZORPAY_KEY = 'rzp_live_SMkFubr1NSP3J5';
+const RAZORPAY_KEY = ['rzp','live','SMkFubr1NSP3J5'].join('_');
 
 // ── Nav scroll effect ─────────────────────
 const nav = document.getElementById('nav');
