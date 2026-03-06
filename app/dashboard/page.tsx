@@ -11,6 +11,7 @@ import {
   Calendar, Map, Mail, Rocket, Lightbulb, Bell,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import Script from "next/script";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Plan = "free" | "launch" | "founder";
@@ -69,15 +70,68 @@ function UpgradeModal({ plan, onClose, onSuccess }: { plan: "launch" | "founder"
   const info = {
     launch: {
       name: "Launch Plan", price: "$9", period: "one-time",
-      feats: ["AI reads your actual website", "10 best-match communities", "15 posts per platform", "15-day launch calendar", "Reddit · LinkedIn · Twitter · WhatsApp", "Distribution map", "Cold outreach bundle (4 emails)", "Landing page improvements", "Viral score + strategy report"],
+      feats: ["AI reads your actual website", "10 best-match communities", "15 ready-to-post content pieces", "20-day launch calendar", "Reddit · LinkedIn · Twitter · WhatsApp", "15 regenerations per platform", "Viral score + strategy report", "Custom angle generation"],
     },
     founder: {
       name: "Founder Plan", price: "$19", period: "/month",
-      feats: ["Everything in Launch", "Unlimited post regeneration", "30-day launch calendar", "Product Hunt launch kit", "20+ communities", "Priority support"],
+      feats: ["Everything in Launch", "20+ communities per product", "30-day calendar — renewed monthly", "Unlimited content regeneration", "Custom angle generation", "Product Hunt launch kit", "Pre-written reply suggestions", "Priority support"],
     },
-  }[plan];
+  }[plan]!;
+  const [loading, setLoading] = useState(false);
+  const { data: session } = useSession();
+
+  const handlePayment = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/payment/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan, userId: (session?.user as any)?.id || null }),
+      });
+      const orderData = await res.json();
+      if (!res.ok) throw new Error(orderData.error);
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "LaunchPe",
+        description: info.name,
+        order_id: orderData.orderId,
+        handler: async function (response: any) {
+          const verifyRes = await fetch("/api/payment/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...response, plan, userId: (session?.user as any)?.id || null }),
+          });
+          const verifyData = await verifyRes.json();
+          if (verifyRes.ok && verifyData.success) {
+            onSuccess(plan);
+          } else {
+            toast.error("Payment verification failed");
+          }
+        },
+        prefill: {
+          email: session?.user?.email || "",
+        },
+        theme: { color: "#1c1917" }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on("payment.failed", function (resp: any) {
+        toast.error("Payment failed. Please try again.");
+      });
+      rzp.open();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to initiate payment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <motion.div initial={{ opacity: 0, scale: .96, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         className="relative bg-white rounded-2xl shadow-2xl p-7 w-full max-w-sm z-10">
@@ -88,15 +142,10 @@ function UpgradeModal({ plan, onClose, onSuccess }: { plan: "launch" | "founder"
         <div className="font-serif text-5xl text-stone-900">{info.price}</div>
         <p className="text-sm text-stone-400 mb-4">{info.period}</p>
 
-        {/* Testing bypass */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
-          <p className="text-xs font-semibold text-amber-700 mb-2.5">🧪 Testing mode — instant free access</p>
-          <button onClick={() => onSuccess(plan)}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm">
-            ✓ Activate {info.name} Free
-          </button>
-          <p className="text-xs text-amber-600 text-center mt-2">No payment required · Remove before going live</p>
-        </div>
+        <button onClick={handlePayment} disabled={loading}
+          className="w-full bg-stone-900 hover:bg-stone-800 text-white font-semibold py-3 rounded-xl transition-colors mb-5 flex items-center justify-center gap-2">
+          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Pay with Razorpay"}
+        </button>
 
         <hr className="border-stone-100 mb-4" />
         <ul className="space-y-2">
