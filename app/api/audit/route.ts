@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { groq } from "@/lib/groq";
 
+export const maxDuration = 60; // Allow up to 60 seconds on Vercel
+
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);

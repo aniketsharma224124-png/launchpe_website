@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { analyzeProduct } from "@/lib/groq";
 import { supabaseAdmin } from "@/lib/supabase";
 
+export const maxDuration = 60; // Allow up to 60 seconds on Vercel
+
 export async function POST(req: NextRequest) {
   try {
     const { url, userId } = await req.json();
